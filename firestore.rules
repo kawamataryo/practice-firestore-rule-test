@@ -1,11 +1,28 @@
 rules_version = '2';
 service cloud.firestore {
+  function isAuthUser(auth, userId) {
+    return auth != null && auth.uid == userId // 認証があり、uidとuserIdが一致する
+  }
+
+  function isValidUserSchema(user) {
+    return user.size() == 3 // ドキュメントは3つのプロパティをもつこと
+      && 'name' in user && user.name is string // nameのプロパティがあり、nameの型がstringであること
+      && 'gender' in user && user.gender is string // genderのプロパティがあり、genderの型がstringであること
+      && 'age' in user && user.age is number // ageのプロパティがあり、ageの型がnumberであること
+  }
+
+  function isValidUserData(user) {
+    return 1 <= user.name.size() && user.name.size() <= 30 // nameは1文字以上30文字以内であること
+      && user.gender.matches('male|female|genderDiverse') // `gender`は`male`, `female`, `genderDiverse`の３種類だけが選べる
+      && 0 <= user.age && user.age <= 150 // `age`は0〜150の数値である
+  }
+
   match /databases/{database}/documents {
     match /users/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-      allow create: if request.auth != null && request.auth.uid == userId;
-      allow update: if request.auth != null && request.auth.uid == userId;
-      allow delete: if request.auth != null && request.auth.uid == userId;
+      allow read:  if isAuthUser(request.auth, userId);
+      allow create: if isAuthUser(request.auth, userId) && isValidUserSchema(request.resource.data) && isValidUserData(request.resource.data);
+      allow update: if isAuthUser(request.auth, userId) && isValidUserSchema(request.resource.data) && isValidUserData(request.resource.data);
+      allow delete: if isAuthUser(request.auth, userId);
     }
   }
 }

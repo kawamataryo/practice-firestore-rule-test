@@ -33,7 +33,7 @@ describe("Firestoreルールテスト", () => {
   const correctUserData = {
     name: "suzuki taro",
     gender: "male",
-    birthday: "1989/04/25"
+    age: 30
   };
 
   describe("認証情報の検証", () => {
@@ -85,6 +85,100 @@ describe("Firestoreルールテスト", () => {
 
       // 自分のuidと同様のドキュメントIDのユーザー情報を削除不可
       await firebase.assertFails(userDocumentRef.delete());
+    });
+  });
+
+  describe("スキーマの検証", () => {
+    test("正しくないスキーマの場合は作成できない", async () => {
+      // taroで認証を持つDBの作成
+      const db = authedApp({ uid: "taro" });
+
+      // taroでusersコレクションへの参照を取得
+      const userDocumentRef = db.collection("users").doc("taro");
+
+      // 想定外のプロパティがある場合
+      await firebase.assertFails(
+        userDocumentRef.set({ ...correctUserData, place: "japan" })
+      );
+
+      // プロパティの型が異なる場合
+      await firebase.assertFails(
+        userDocumentRef.set({ ...correctUserData, age: "1" })
+      );
+    });
+  });
+
+  describe("値のバリデーション", () => {
+    test("nameは1文字以上30文字以内である", async () => {
+      // taroで認証を持つDBの作成
+      const db = authedApp({ uid: "taro" });
+
+      // taroでusersコレクションへの参照を取得
+      const userDocumentRef = db.collection("users").doc("taro");
+
+      // 正しい値ではデータを作成できる
+      await firebase.assertSucceeds(
+        userDocumentRef.set({ ...correctUserData, name: "a".repeat(30) })
+      );
+
+      // 正しくない値ではデータを作成できない
+      await firebase.assertFails(
+        userDocumentRef.set({ ...correctUserData, name: "" })
+      );
+      await firebase.assertFails(
+        userDocumentRef.set({ ...correctUserData, name: "a".repeat(31) })
+      );
+    });
+
+    test("`gender`は`male`, `female`, `genderDiverse`の３種類だけが選べる", async () => {
+      // taroで認証を持つDBの作成
+      const db = authedApp({ uid: "taro" });
+
+      // taroでusersコレクションへの参照を取得
+      const userDocumentRef = db.collection("users").doc("taro");
+
+      // 正しい値ではデータを作成できる
+      await firebase.assertSucceeds(
+        userDocumentRef.set({ ...correctUserData, gender: "male" })
+      );
+      await firebase.assertSucceeds(
+        userDocumentRef.set({ ...correctUserData, gender: "female" })
+      );
+      await firebase.assertSucceeds(
+        userDocumentRef.set({ ...correctUserData, gender: "genderDiverse" })
+      );
+
+      // 正しくない値ではデータを作成できない
+      await firebase.assertFails(
+        userDocumentRef.set({ ...correctUserData, gender: "" })
+      );
+      await firebase.assertFails(
+        userDocumentRef.set({ ...correctUserData, gender: "男性" })
+      );
+    });
+
+    test("`age`は0〜150の数値である", async () => {
+      // taroで認証を持つDBの作成
+      const db = authedApp({ uid: "taro" });
+
+      // taroでusersコレクションへの参照を取得
+      const userDocumentRef = db.collection("users").doc("taro");
+
+      // 正しい値ではデータを作成できる
+      await firebase.assertSucceeds(
+        userDocumentRef.set({ ...correctUserData, age: 0 })
+      );
+      await firebase.assertSucceeds(
+        userDocumentRef.set({ ...correctUserData, age: 150 })
+      );
+
+      // 正しくない値ではデータを作成できない
+      await firebase.assertFails(
+        userDocumentRef.set({ ...correctUserData, age: -1 })
+      );
+      await firebase.assertFails(
+        userDocumentRef.set({ ...correctUserData, age: 151 })
+      );
     });
   });
 });
