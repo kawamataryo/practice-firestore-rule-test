@@ -4,13 +4,13 @@ import * as fs from "fs";
 const testName = "firestore-local-emulator-test";
 const rulesFilePath = "firestore.rules";
 
-const authedApp = (auth?: object): firebase.firestore.Firestore => {
+const createAuthApp = (auth?: object): firebase.firestore.Firestore => {
   return firebase
     .initializeTestApp({ projectId: testName, auth: auth })
     .firestore();
 };
 
-const adminApp = (): firebase.firestore.Firestore => {
+const createAdminApp = (): firebase.firestore.Firestore => {
   return firebase.initializeAdminApp({ projectId: testName }).firestore();
 };
 
@@ -39,7 +39,7 @@ describe("Firestoreルールテスト", () => {
   describe("認証情報の検証", () => {
     test("自分のuidと同様のドキュメントIDのユーザー情報だけを閲覧、作成、編集、削除可能", async () => {
       // taroで認証を持つDBの作成
-      const db = authedApp({ uid: "taro" });
+      const db = createAuthApp({ uid: "taro" });
 
       // taroでusersコレクションへの参照を取得
       const userDocumentRef = db.collection("users").doc("taro");
@@ -61,13 +61,13 @@ describe("Firestoreルールテスト", () => {
 
     test("自分のuidと異なるドキュメントは閲覧、作成、編集、削除が出来ない", async () => {
       // 事前にadmin権限で別ユーザーでのデータを準備
-      adminApp()
+      createAdminApp()
         .collection("users")
         .doc("taro")
         .set(correctUserData);
 
       // hanakoで認証を持つDBの作成
-      const db = authedApp({ uid: "hanako" });
+      const db = createAuthApp({ uid: "hanako" });
 
       // taroでusersコレクションへの参照を取得
       const userDocumentRef = db.collection("users").doc("taro");
@@ -91,7 +91,7 @@ describe("Firestoreルールテスト", () => {
   describe("スキーマの検証", () => {
     test("正しくないスキーマの場合は作成できない", async () => {
       // taroで認証を持つDBの作成
-      const db = authedApp({ uid: "taro" });
+      const db = createAuthApp({ uid: "taro" });
 
       // taroでusersコレクションへの参照を取得
       const userDocumentRef = db.collection("users").doc("taro");
@@ -103,15 +103,43 @@ describe("Firestoreルールテスト", () => {
 
       // プロパティの型が異なる場合
       await firebase.assertFails(
+        userDocumentRef.set({ ...correctUserData, name: 1234 })
+      );
+      await firebase.assertFails(
+        userDocumentRef.set({ ...correctUserData, gender: true })
+      );
+      await firebase.assertFails(
         userDocumentRef.set({ ...correctUserData, age: "1" })
       );
+    });
+
+    test("正しくないスキーマの場合は編集できない", async () => {
+      // 事前にadmin権限で別ユーザーでのデータを準備
+      createAdminApp()
+        .collection("users")
+        .doc("taro")
+        .set(correctUserData);
+
+      // taroで認証を持つDBの作成
+      const db = createAuthApp({ uid: "taro" });
+
+      // taroでusersコレクションへの参照を取得
+      const userDocumentRef = db.collection("users").doc("taro");
+
+      // 想定外のプロパティがある場合
+      await firebase.assertFails(userDocumentRef.update({ place: "japan" }));
+
+      // プロパティの型が異なる場合
+      await firebase.assertFails(userDocumentRef.update({ name: 1234 }));
+      await firebase.assertFails(userDocumentRef.set({ gender: true }));
+      await firebase.assertFails(userDocumentRef.set({ age: "1" }));
     });
   });
 
   describe("値のバリデーション", () => {
     test("nameは1文字以上30文字以内である", async () => {
       // taroで認証を持つDBの作成
-      const db = authedApp({ uid: "taro" });
+      const db = createAuthApp({ uid: "taro" });
 
       // taroでusersコレクションへの参照を取得
       const userDocumentRef = db.collection("users").doc("taro");
@@ -132,7 +160,7 @@ describe("Firestoreルールテスト", () => {
 
     test("`gender`は`male`, `female`, `genderDiverse`の３種類だけが選べる", async () => {
       // taroで認証を持つDBの作成
-      const db = authedApp({ uid: "taro" });
+      const db = createAuthApp({ uid: "taro" });
 
       // taroでusersコレクションへの参照を取得
       const userDocumentRef = db.collection("users").doc("taro");
@@ -159,7 +187,7 @@ describe("Firestoreルールテスト", () => {
 
     test("`age`は0〜150の数値である", async () => {
       // taroで認証を持つDBの作成
-      const db = authedApp({ uid: "taro" });
+      const db = createAuthApp({ uid: "taro" });
 
       // taroでusersコレクションへの参照を取得
       const userDocumentRef = db.collection("users").doc("taro");
